@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Daraz Shopping Assistant</title>
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngs7VZt27NXFoaoApmYm81iuXoPkJwJ8ERdknLPMO" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+3LBlXeVIU" crossorigin="anonymous">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css')}}"/>
+	</head>
+
+	<body>
+		<main class="page-shell">
+			<header class="page-intro">
+				<div class="page-brand">
+					<span class="page-brand-mark" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span>
+					<span>Daraz · Product discovery</span>
+				</div>
+				<h1>Find something you'll love.</h1>
+				<p>Tell us what you need. We’ll help narrow down the good finds.</p>
+			</header>
+
+			<div class="row justify-content-center">
+				<div class="col-md-10 col-lg-9 col-xl-8 chat">
+					<section class="card" aria-label="Shopping assistant chat">
+						<div class="card-header msg_head">
+							<div class="assistant-identity">
+								<div class="assistant-avatar" aria-hidden="true"><i class="fas fa-shopping-bag"></i></div>
+								<div class="user_info">
+									<span>Shopping assistant</span>
+									<p>Product picks, made personal</p>
+								</div>
+							</div>
+							<div class="assistant-status"><span class="online_icon"></span>Here to help</div>
+						</div>
+						<div id="messageFormeight" class="card-body msg_card_body" role="log" aria-live="polite" aria-relevant="additions">
+							<div class="welcome-note" id="welcomeMessage">
+								<p class="welcome-kicker">START WITH WHAT YOU NEED</p>
+								<p>Shopping for a gift, upgrading something, or working to a budget? Share a few details and we’ll find a place to start.</p>
+							</div>
+						</div>
+						<div class="card-footer">
+							<form id="messageArea" class="input-group">
+								<input type="text" id="text" name="msg" placeholder="Try “wireless headphones under ₹3,000”" autocomplete="off" class="form-control type_msg" aria-label="Describe what you are looking for" required/>
+								<div class="input-group-append">
+									<button type="submit" id="send" class="input-group-text send_btn" aria-label="Send message"><i class="fas fa-arrow-up"></i></button>
+								</div>
+							</form>
+						</div>
+					</section>
+				</div>
+			</div>
+		</main>
+
+		<script>
+			$(document).ready(function() {
+				$("#messageArea").on("submit", function(event) {
+					event.preventDefault();
+					const date = new Date();
+					const hour = date.getHours();
+					const minute = date.getMinutes();
+					const str_time = hour+":"+minute;
+					var rawText = $("#text").val();
+
+					$("#welcomeMessage").remove();
+					var userHtml = '<div class="d-flex justify-content-end mb-4"><div class="msg_cotainer_send">' + rawText + '<span class="msg_time_send">'+ str_time + '</span></div><div class="img_cont_msg"><img src="https://i.ibb.co/d5b84Xw/Untitled-design.png" class="rounded-circle user_img_msg" alt=""></div></div>';
+
+					$("#text").val("");
+					$("#messageFormeight").append(userHtml);
+
+					$.ajax({
+						data: {
+							msg: rawText,
+						},
+						type: "POST",
+						url: "/get",
+					}).done(function(data) {
+						var botHtml = '<div class="d-flex justify-content-start mb-4"><div class="img_cont_msg"><span class="assistant-avatar assistant-avatar-small" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span></div><div class="msg_cotainer">' + data + '<span class="msg_time">' + str_time + '</span></div></div>';
+						$("#messageFormeight").append($.parseHTML(botHtml));
+					});
+				});
+			});
+		</script>
+	</body>
+</html>
