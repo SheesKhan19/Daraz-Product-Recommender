@@ -6,6 +6,8 @@
 		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngs7VZt27NXFoaoApmYm81iuXoPkJwJ8ERdknLPMO" crossorigin="anonymous">
 		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+3LBlXeVIU" crossorigin="anonymous">
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css')}}"/>
 	</head>
 
@@ -53,31 +55,100 @@
 		</main>
 
 		<script>
+			function escapeHtml(text) {
+				return $("<div>").text(text).html();
+			}
+
+			function formatBotReply(text) {
+				var raw = String(text || "").trim();
+				if (!raw) {
+					return '<div class="bot-text bot-markdown"><p>No response received.</p></div>';
+				}
+
+				if (window.marked) {
+					marked.setOptions({ breaks: true, gfm: true });
+					var html = marked.parse(raw);
+					html = html.replace(/<table/g, '<div class="table-wrap"><table').replace(/<\/table>/g, "</table></div>");
+					if (window.DOMPurify) {
+						html = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+					}
+					return '<div class="bot-text bot-markdown">' + html + "</div>";
+				}
+
+				return '<div class="bot-text bot-markdown"><p>' + escapeHtml(raw).replace(/\n/g, "<br>") + "</p></div>";
+			}
+
+			function scrollChatToBottom() {
+				var el = document.getElementById("messageFormeight");
+				el.scrollTop = el.scrollHeight;
+			}
+
+			function setComposerEnabled(enabled) {
+				$("#text").prop("disabled", !enabled);
+				$("#send").prop("disabled", !enabled);
+			}
+
+			function showTypingIndicator() {
+				var html =
+					'<div class="d-flex justify-content-start mb-4 chat-row typing-row" id="typingIndicator">' +
+					'<div class="img_cont_msg"><span class="assistant-avatar assistant-avatar-small" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span></div>' +
+					'<div class="msg_cotainer msg_cotainer--typing" aria-busy="true" aria-label="Assistant is typing">' +
+					'<span class="typing-dots"><span></span><span></span><span></span></span></div></div>';
+				$("#messageFormeight").append(html);
+				scrollChatToBottom();
+			}
+
 			$(document).ready(function() {
 				$("#messageArea").on("submit", function(event) {
 					event.preventDefault();
+					var rawText = ($("#text").val() || "").trim();
+					if (!rawText) return;
+
 					const date = new Date();
-					const hour = date.getHours();
-					const minute = date.getMinutes();
-					const str_time = hour+":"+minute;
-					var rawText = $("#text").val();
+					const str_time = date.getHours() + ":" + String(date.getMinutes()).padStart(2, "0");
 
 					$("#welcomeMessage").remove();
-					var userHtml = '<div class="d-flex justify-content-end mb-4"><div class="msg_cotainer_send">' + rawText + '<span class="msg_time_send">'+ str_time + '</span></div><div class="img_cont_msg"><img src="https://i.ibb.co/d5b84Xw/Untitled-design.png" class="rounded-circle user_img_msg" alt=""></div></div>';
+					var userHtml =
+						'<div class="d-flex justify-content-end mb-4 chat-row">' +
+						'<div class="msg_cotainer_send">' + escapeHtml(rawText) +
+						'<span class="msg_time_send">' + str_time + "</span></div>" +
+						'<div class="img_cont_msg"><img src="https://i.ibb.co/d5b84Xw/Untitled-design.png" class="rounded-circle user_img_msg" alt=""></div></div>';
 
 					$("#text").val("");
 					$("#messageFormeight").append(userHtml);
+					scrollChatToBottom();
+					setComposerEnabled(false);
+					showTypingIndicator();
 
 					$.ajax({
-						data: {
-							msg: rawText,
-						},
+						data: { msg: rawText },
 						type: "POST",
 						url: "/get",
-					}).done(function(data) {
-						var botHtml = '<div class="d-flex justify-content-start mb-4"><div class="img_cont_msg"><span class="assistant-avatar assistant-avatar-small" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span></div><div class="msg_cotainer">' + data + '<span class="msg_time">' + str_time + '</span></div></div>';
-						$("#messageFormeight").append($.parseHTML(botHtml));
-					});
+					})
+						.done(function(data) {
+							$("#typingIndicator").remove();
+							var botHtml =
+								'<div class="d-flex justify-content-start mb-4 chat-row">' +
+								'<div class="img_cont_msg"><span class="assistant-avatar assistant-avatar-small" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span></div>' +
+								'<div class="msg_cotainer msg_cotainer--reply">' + formatBotReply(data) +
+								'<span class="msg_time">' + str_time + "</span></div></div>";
+							$("#messageFormeight").append(botHtml);
+							scrollChatToBottom();
+						})
+						.fail(function() {
+							$("#typingIndicator").remove();
+							var errHtml =
+								'<div class="d-flex justify-content-start mb-4 chat-row">' +
+								'<div class="img_cont_msg"><span class="assistant-avatar assistant-avatar-small" aria-hidden="true"><i class="fas fa-shopping-bag"></i></span></div>' +
+								'<div class="msg_cotainer msg-error"><span class="bot-text"><p>Something went wrong. Please try again in a moment.</p></span>' +
+								'<span class="msg_time">' + str_time + "</span></div></div>";
+							$("#messageFormeight").append(errHtml);
+							scrollChatToBottom();
+						})
+						.always(function() {
+							setComposerEnabled(true);
+							$("#text").focus();
+						});
 				});
 			});
 		</script>
